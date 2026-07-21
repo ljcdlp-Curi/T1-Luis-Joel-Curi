@@ -1,12 +1,10 @@
 package edu.pe.cibertec.taller.servicio;
 
+import edu.pe.cibertec.taller.excepcion.CitaNoCancelableException;
 import edu.pe.cibertec.taller.excepcion.EspecialidadIncorrectaException;
 import edu.pe.cibertec.taller.excepcion.HorarioNoPermitidoException;
 import edu.pe.cibertec.taller.excepcion.MecanicoNoEncontradoException;
-import edu.pe.cibertec.taller.modelo.Cita;
-import edu.pe.cibertec.taller.modelo.EstadoCita;
-import edu.pe.cibertec.taller.modelo.Mecanico;
-import edu.pe.cibertec.taller.modelo.TipoServicio;
+import edu.pe.cibertec.taller.modelo.*;
 import edu.pe.cibertec.taller.repositorio.RepositorioCitas;
 import edu.pe.cibertec.taller.repositorio.RepositorioMecanicos;
 import edu.pe.cibertec.taller.servicio.impl.ServicioCitasImpl;
@@ -405,18 +403,56 @@ class ServicioCitasImplTest {
 		// Assert
 		// TODO
 	}
-
 	@Test
 	@DisplayName("Cancelar con 24 horas o mas de anticipacion no genera penalidad")
 	void cancelarConAnticipacionSuficiente() {
 		// Arrange
 		// TODO
+		Long idCita = 1L;
+
+		LocalDateTime zafiro = LocalDateTime.of(2026, 9, 13, 10, 0);
+
+		Cita cita = new Cita();
+		cita.setId(idCita);
+		cita.setPlacaVehiculo("CUR-794");
+		cita.setTipoServicio(TipoServicio.CAMBIO_ACEITE);
+		cita.setFechaHoraInicio(LocalDateTime.of(2026, 9, 14, 10, 0));
+		cita.setDuracionHoras(1);
+		cita.setEstado(EstadoCita.PROGRAMADA);
+
+
+		when(repositorioCitas.findById(idCita))
+				.thenReturn(Optional.of(cita));
+
+		when(proveedorFechaHora.ahora())
+				.thenReturn(zafiro);
+
+		when(repositorioCitas.save(any(Cita.class)))
+				.thenAnswer(invocation -> invocation.getArgument(0));
 
 		// Act
 		// TODO
+		ResultadoCancelacion resultado =
+				servicioCitas.cancelarCita(idCita);
 
 		// Assert
 		// TODO: penalidad 0, estado CANCELADA, notificacion
+		assertEquals(
+				0.0,
+				resultado.getMontoPenalidad()
+		);
+
+		assertTrue(
+				resultado.isExitoso()
+		);
+
+		assertEquals(
+				EstadoCita.CANCELADA,
+				cita.getEstado()
+		);
+
+		verify(servicioNotificaciones)
+				.notificarCitaCancelada(cita);
 	}
 
 	@Test
@@ -424,12 +460,52 @@ class ServicioCitasImplTest {
 	void cancelarConAvisoTardio() {
 		// Arrange
 		// TODO
+		Long idCita = 1L;
+
+		LocalDateTime zafiro = LocalDateTime.of(2026, 9, 14, 8, 0);
+
+		Cita cita = new Cita();
+		cita.setId(idCita);
+		cita.setPlacaVehiculo("CUR-794");
+		cita.setTipoServicio(TipoServicio.CAMBIO_ACEITE);
+		cita.setFechaHoraInicio(LocalDateTime.of(2026, 9, 14, 10, 0));
+		cita.setDuracionHoras(1);
+		cita.setEstado(EstadoCita.PROGRAMADA);
+
+
+		when(repositorioCitas.findById(idCita))
+				.thenReturn(Optional.of(cita));
+
+		when(proveedorFechaHora.ahora())
+				.thenReturn(zafiro);
+
+		when(repositorioCitas.save(any(Cita.class)))
+				.thenAnswer(invocation -> invocation.getArgument(0));
 
 		// Act
 		// TODO
+		ResultadoCancelacion resultado =
+				servicioCitas.cancelarCita(idCita);
 
 		// Assert
 		// TODO
+		assertEquals(
+				50.0,
+				resultado.getMontoPenalidad()
+		);
+
+		assertTrue(
+				resultado.isExitoso()
+		);
+
+		assertEquals(
+				EstadoCita.CANCELADA,
+				cita.getEstado()
+		);
+
+		verify(servicioNotificaciones)
+				.notificarCitaCancelada(cita);
+
 	}
 
 	@Test
@@ -447,9 +523,28 @@ class ServicioCitasImplTest {
 	void cancelarCitaYaCancelada() {
 		// Arrange
 		// TODO
+		Long idCita = 1L;
+
+		Cita cita = new Cita();
+		cita.setId(idCita);
+		cita.setPlacaVehiculo("CUR-794");
+		cita.setTipoServicio(TipoServicio.CAMBIO_ACEITE);
+		cita.setFechaHoraInicio(
+				LocalDateTime.of(2026, 9, 14, 10, 0)
+		);
+		cita.setDuracionHoras(1);
+		cita.setEstado(EstadoCita.ATENDIDA);
+
+
+		when(repositorioCitas.findById(idCita))
+				.thenReturn(Optional.of(cita));
 
 		// Act y Assert
 		// TODO
+		assertThrows(
+				CitaNoCancelableException.class,
+				() -> servicioCitas.cancelarCita(idCita)
+		);
 	}
 
 	@Test
